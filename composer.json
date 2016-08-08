@@ -1,0 +1,17 @@
+{
+    "name": "talesoft/tale-ro-grf",
+    "description": "Ragnarok Online GRF library",
+    "minimum-stability": "dev",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Torben Koehn",
+            "email": "torben@talesoft.codes"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "": "src/"
+        }
+    }
+}
