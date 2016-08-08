@@ -1,0 +1,20 @@
+{
+    "name": "talesoft/tale-ro-grf",
+    "description": "Ragnarok Online GRF library",
+    "minimum-stability": "dev",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Torben Koehn",
+            "email": "torben@talesoft.codes"
+        }
+    ],
+    "require": {
+        "symfony/polyfill-mbstring": "^1.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "": "src/"
+        }
+    }
+}
