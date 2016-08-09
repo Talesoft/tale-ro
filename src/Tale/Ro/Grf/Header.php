@@ -156,10 +156,4 @@ class Header
 
         return $this;
     }
-
-    public function getRealFileCount()
-    {
-
-        return $this->fileCount - $this->seed - 7;
-    }
 }

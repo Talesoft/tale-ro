@@ -3,7 +3,7 @@
 namespace Tale\Ro\Grf;
 
 use Tale\Ro\Grf;
-use Tale\Ro\Grf\File\ArchiveInfo;
+use Tale\Ro\Grf\File\Info;
 
 //https://sourceforge.net/p/openkore/code/HEAD/tree/grftool/trunk/lib/grf.c#l192
 //http://www.vbforums.com/showthread.php?584540-Reading-GRF-files
@@ -11,13 +11,15 @@ class Archive
 {
     
     private $path;
+    private $useUtf8Paths;
     private $header;
     private $files;
     
-    public function __construct($path)
+    public function __construct($path, $useUtf8Paths = true)
     {
 
         $this->path = $path;
+        $this->useUtf8Paths = $useUtf8Paths;
         $this->header = $this->readHeader();
         $this->files = $this->readFileTable();
     }
@@ -29,6 +31,12 @@ class Archive
     {
 
         return $this->path;
+    }
+
+    public function isUsingUtf8Paths()
+    {
+
+        return $this->useUtf8Paths;
     }
 
     /**
@@ -71,17 +79,75 @@ class Archive
 
     /**
      * @param $pattern
+     * @param null $resultCount
      * @return File[]
      */
-    public function searchFiles($pattern)
+    public function searchFiles($pattern, $resultCount = null)
     {
 
         $files = [];
-        foreach ($this->files as $path => $info)
-            if (preg_match($pattern, $path))
+        $i = 0;
+        foreach ($this->files as $path => $info) {
+            if (preg_match($pattern, $path)) {
+
                 $files[$path] = $info;
 
+                if ($resultCount !== null && ++$i >= $resultCount)
+                    break;
+            }
+        }
+
         return $files;
+    }
+
+    /**
+     * @param $path
+     * @param bool $recursive
+     * @param bool $sort
+     * @return File[]
+     */
+    public function getFilesIn($path, $recursive = false, $sort = true)
+    {
+
+        $path = trim($path, '\\').'\\';
+        $len = mb_strlen($path);
+
+        $dirs = [];
+        $files = [];
+        foreach ($this->files as $filePath => $info) {
+
+            if ($path !== '\\' && strncmp($path, $filePath, $len) !== 0)
+                continue;
+
+            if (!$recursive && ($pos = mb_strpos(mb_substr($filePath, $len), '\\')) !== false) {
+
+                //This could still be an interesting path, for a directory name!
+                //Notice that usually directories don't exist in the file table, we check it prior to that
+                //(if there is a directory with that name, it will land in here automatically through this loop)
+
+                $dirPath = mb_substr($filePath, 0, $pos + $len);
+
+                if ($dirPath !== $path && !isset($this->files[$dirPath]) && !isset($dirs[$dirPath]))
+                    $dirs[$dirPath] = new File($this, $dirPath);
+
+                continue;
+            }
+
+            $files[$filePath] = $info;
+        }
+
+        if ($sort) {
+
+            $caseInsensitiveSorter = function($a, $b) {
+
+                return strcmp(strtolower($a), strtolower($b));
+            };
+
+            uksort($dirs, $caseInsensitiveSorter);
+            ksort($files, $caseInsensitiveSorter);
+        }
+
+        return array_replace($dirs, $files);
     }
 
     private function createEmptyHeader()
@@ -110,29 +176,34 @@ class Archive
 
         $fp = fopen($this->path, 'rb');
 
+        $header = unpack(
+            'A15magicHeader/A15encryptionWatermark/VfileTableOffset/Vseed/VfileCount/Vversion', 
+            fread($fp, Grf::HEADER_SIZE)
+        );
+        
+        fclose($fp);
+
         //Read and check magic header
-        $magicHeader = fread($fp, 15);
-        if ($magicHeader !== Grf::MAGIC_HEADER)
+        if ($header['magicHeader'] !== Grf::MAGIC_HEADER)
             throw new \RuntimeException(
                 "Passed GRF file $this->path is not a valid GRF file (Magic header mismatch)"
             );
-        
-        //Read encryption watermark
-        $encryptionWatermark = array_map('ord', str_split(fread($fp, 15)));
-        $fileTableOffset = $this->readUInt32($fp);
-        $seed = $this->readUInt32($fp);
-        $fileCount = $this->readUInt32($fp);
-        $version = $this->readUInt32($fp);
-        fclose($fp);
 
-        return new Header($magicHeader, $encryptionWatermark, $fileTableOffset, $seed, $fileCount, $version);
+        return new Header(
+            $header['magicHeader'],
+            array_map('ord', str_split($header['encryptionWatermark'])),
+            $header['fileTableOffset'],
+            $header['seed'],
+            $header['fileCount'] - $header['seed'] - 7, //Notice this. It's important. Failed obfuscation attempt of gravity.
+            $header['version']
+        );
     }
 
     private function readFileTable()
     {
 
         //No files, no need to parse any table
-        if ($this->header->getRealFileCount() < 1)
+        if ($this->header->getFileCount() < 1)
             return [];
 
         //Calculate total offset of the file table
@@ -151,20 +222,24 @@ class Archive
         //Jump to file table offset
         fseek($fp, $offset);
 
-        //Get file table sizes
-        $compressedSize = $this->readUInt32($fp);
-        $size = $this->readUInt32($fp);
+        //Extract compressed size and size
+        $data = unpack('VcompressedSize/Vsize', fread($fp, 8));
 
         //Read the compressed file table
-        $compressedTableData = fread($fp, $compressedSize);
+        $compressedTableData = fread($fp, $data['compressedSize']);
 
         fclose($fp);
 
-        //Decompress table
-        $tableData = zlib_decode($compressedTableData, $size);
+        //Decompress table (Not using the second parameter, it leads to insufficient memory errors :()
+        $tableData = @zlib_decode($compressedTableData);
+
+        if ($tableData === false)
+            throw new \RuntimeException(
+                "Failed to decompress the file table of $this->path"
+            );
 
         //Validate
-        if (strlen($tableData) !== $size)
+        if (strlen($tableData) !== $data['size'])
             throw new \RuntimeException(
                 "Passed GRF $this->path contains a corrupt file table: File table size was ".strlen($tableData).", but $size was expected"
             );
@@ -180,7 +255,7 @@ class Archive
     {
 
         $files = [];
-        for ($i = 0, $o = 0; $i < $this->header->getRealFileCount(); $i++) {
+        for ($i = 0, $o = 0; $i < $this->header->getFileCount(); $i++) {
 
             //read filename until 0x00
             $path = '';
@@ -192,10 +267,14 @@ class Archive
             }
             $o++;
 
-            $data = unpack('V1compressedSize/V1alignedSize/V1size/C1flags/V1offset', substr($tableData, $o, 17));
+            //Convert the path to unicode (Warning: This will require mb_* pendants at points working with the path)
+            if ($this->useUtf8Paths)
+                $path = mb_convert_encoding($path, 'UTF-8', 'EUC-KR');
+
+            $data = unpack('VcompressedSize/ValignedSize/Vsize/Cflags/Voffset', substr($tableData, $o, 17));
             $o += 17;
 
-            $archiveInfo = new ArchiveInfo(
+            $archiveInfo = new Info(
                 $data['compressedSize'],
                 $data['alignedSize'],
                 $data['size'],
@@ -222,20 +301,52 @@ class Archive
         );
     }
 
-    private function readBinaryValue($fp, $format, $readLength)
+    private function registerFileInFileTree(array &$tree, File $file)
     {
 
-        if (feof($fp))
-            throw new \RuntimeException(
-                "Failed to read $format from $this->path: No more bytes to read"
-            );
+        if ($file->isDirectory())
+            return;
 
-        return unpack($format, fread($fp, $readLength))[1];
+        $parts = explode('\\', trim($file->getPath(), '\\'));
+        $last = count($parts) - 1;
+
+        $baseName = $parts[$last];
+        unset($parts[$last]);
+
+        $current = &$tree;
+        foreach ($parts as $part) {
+
+            if (!isset($current[$part]))
+                $current[$part] = [];
+
+            $current = &$current[$part];
+        }
+
+        $current[$baseName] = $file;
     }
 
-    private function readUInt32($fp)
+    public function buildFileTree()
     {
 
-        return $this->readBinaryValue($fp, 'V', 4);
+        $tree = [];
+        foreach ($this->files as $file)
+            $this->registerFileInFileTree($tree, $file);
+
+        return $tree;
+    }
+
+    public function __toString()
+    {
+
+        return $this->path;
+    }
+
+    public function __debugInfo()
+    {
+
+        return [
+            'header' => $this->header,
+            'files' => $this->files
+        ];
     }
 }

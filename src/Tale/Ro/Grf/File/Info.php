@@ -2,7 +2,7 @@
 
 namespace Tale\Ro\Grf\File;
 
-class ArchiveInfo
+class Info
 {
 
     private $compressedSize;

@@ -1,1 +1,4 @@
-/test/data.grf
+/.idea
+/vendor
+/test/*.txt
+/test/*.grf

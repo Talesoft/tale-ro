@@ -2,8 +2,6 @@
 
 namespace Tale\Ro;
 
-use Tale\Ro\Grf\Header;
-
 class Grf
 {
 
@@ -11,7 +9,7 @@ class Grf
 
     const MAGIC_HEADER_SIZE = 15; //Length of MAGIC_HEADER
     const HEADER_MID_SIZE = self::MAGIC_HEADER_SIZE + 15; //Length of MAGIC_HEADER + ENCRYPTION_WATERMARK
-    const HEADER_SIZE = self::HEADER_MID_SIZE + 16; //HEADER_MID_SIZE + 4x4 ints (table offset, seed, fcount, version)
+    const HEADER_SIZE = self::HEADER_MID_SIZE + 16; //HEADER_MID_SIZE + 4 ints (table offset, seed, fcount, version)
 
     //Important for GRF files with encryption
     const ENCRYPTED_ENCRYPTION_WATERMARK = [
@@ -25,11 +23,9 @@ class Grf
 
     const FILE_TYPE_FILE = 0x01;
     const FILE_TYPE_ENCRYPTED_MIXED = 0x02;
-    const FILE_TYPE_ENCRYPTED_HEADER = 0x04;
+    const FILE_TYPE_ENCRYPTED_DES = 0x04;
 
     const VERSION_200 = 0x200;
     const VERSION_103 = 0x103;
     const VERSION_102 = 0x102;
-    const VERSION_101 = 0x101;
-    const VERSION_100 = 0x100;
 }

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/tale-ro-grf.iml" filepath="$PROJECT_DIR$/.idea/tale-ro-grf.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/tale-ro.iml" filepath="$PROJECT_DIR$/.idea/tale-ro.iml" />
     </modules>
   </component>
 </project>

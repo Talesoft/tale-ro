@@ -9,6 +9,10 @@
             "email": "torben@talesoft.codes"
         }
     ],
+    "require": {
+        "ext-mbstring": "*",
+        "symfony/polyfill-mbstring": "*"
+    },
     "autoload": {
         "psr-4": {
             "": "src/"
