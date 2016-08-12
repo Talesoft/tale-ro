@@ -4,11 +4,12 @@ namespace Tale\Ro\Grf;
 
 use Tale\Ro\Grf;
 use Tale\Ro\Grf\File\Info;
+use Tale\Ro\Spr;
 
 class File
 {
 
-    private $archive;
+    private $grf;
     private $path;
     private $info;
     private $flags;
@@ -16,14 +17,14 @@ class File
 
     /**
      * File constructor.
-     * @param Archive $archive
+     * @param Grf $grf
      * @param $path
-     * @param null $content
-     * @param $flags
      * @param Info $info
+     * @param $flags
+     * @param null $content
      */
     public function __construct(
-        Archive $archive,
+        Grf $grf,
         $path,
         Info $info = null,
         $flags = null,
@@ -31,20 +32,37 @@ class File
     )
     {
 
-        $this->archive = $archive;
+        $this->grf = $grf;
         $this->path = $path;
         $this->info = $info;
         $this->flags = $flags ?: 0;
-        $this->content = $content;
+        $this->content = null;
+
+        if ($content) {
+
+            if (!is_resource($content))
+                throw new \InvalidArgumentException(
+                    "Passed content needs to be valid resource"
+                );
+
+            $this->content = $content;
+        }
+    }
+
+    public function __destruct()
+    {
+
+        if (is_resource($this->content))
+            fclose($this->content);
     }
 
     /**
-     * @return Archive
+     * @return Grf
      */
-    public function getArchive()
+    public function getGrf()
     {
 
-        return $this->archive;
+        return $this->grf;
     }
 
     /**
@@ -54,6 +72,23 @@ class File
     {
 
         return $this->path;
+    }
+
+    public function getExtension()
+    {
+
+        $pos = mb_strrpos($this->path, '.');
+
+        if ($pos === false)
+            return '';
+
+        return mb_substr($this->path, $pos + 1);
+    }
+
+    public function isExtension($ext)
+    {
+
+        return strtolower($ext) === strtolower($this->getExtension());
     }
 
     /**
@@ -95,25 +130,21 @@ class File
     }
 
     /**
-     * @param resource $filePointer
-     * @return string
+     * @return resource
      */
-    public function getContent($filePointer = null)
+    public function getContent()
     {
 
         //If custom content is set, we return that one
         if ($this->content !== null)
             return $this->content;
 
-        if ($filePointer && !is_resource($filePointer))
-            throw new \InvalidArgumentException(
-                "The passed argument to File->getContent needs to be valid file pointer"
-            );
+        //Return a \n separated directory listing if it's a directory
+        if ($this->isDirectory()) {
 
-        
-        //Return a \n separated directory listing if is directory
-        if ($this->isDirectory())
-            return $this->getDirectoryListing();
+            $this->content = fopen('data://text/plain;base64,'.base64_encode($this->getDirectoryListing()), 'r');
+            return $this->content;
+        }
 
         //It's a new file, but no content was given. Give it back as simply empty content.
         if (!$this->isValid())
@@ -131,29 +162,14 @@ class File
         //Calculate total offset of the file content
         $offset = $this->info->getOffset() + Grf::HEADER_SIZE;
 
-        $archivePath = $this->archive->getPath();
-
-        //Make sure this is actually coming from the GRF this file belongs to
-        if ($filePointer) {
-
-            //Make sure the files match
-            $archivePath = realpath($archivePath);
-            $path = realpath(stream_get_meta_data($filePointer)['uri']);
-
-            if ($archivePath !== $path)
-                throw new \RuntimeException(
-                    "The file pointer you passed is not the same file as the source GRF file (got $path, expected $archivePath)"
-                );
-        }
-
         //Check if our offset is in the range of our file size
-        if (filesize($archivePath) < $offset + 1)
+        if ($this->grf->getSize() < $offset + 1)
             throw new \RuntimeException(
-                "Passed GRF $archivePath's file [$this->path] contains invalid offsets"
+                "Passed GRF file [$this->path] contains invalid offsets"
             );
 
 
-        $fp = $filePointer ?: fopen($archivePath, 'rb');
+        $fp = $this->grf->getHandle();
 
         //Jump to file data offset
         fseek($fp, $offset);
@@ -175,34 +191,36 @@ class File
 
         if ($content === false)
             throw new \RuntimeException(
-                "Failed to decompress $archivePath's file [$this->path]"
+                "Failed to decompress file [$this->path]"
             );
 
         if (strlen($content) !== $this->info->getSize())
             throw new \RuntimeException(
-                "Passed GRF $archivePath's file [$this->path] seems to be corrupted. Maybe the GRF is encrypted in ".
+                "Passed GRF file [$this->path] seems to be corrupted. Maybe the GRF is encrypted in ".
                 "some mysterious way."
             );
 
-        if (!$filePointer)
-            fclose($fp);
+        if ($this->grf->getHeader()->getVersion() < Grf::VERSION_200)
+            $content = $this->parseFileContent10x($content);
 
-        if ($this->archive->getHeader()->getVersion() >= Grf::VERSION_200)
-            $this->content = $content;
-        else
-            $this->content = $this->parseFileContent10x($compressedContent);
+        $this->content = fopen('data://text/plain;base64,'.base64_encode($content), 'rb');
 
         return $this->content;
     }
 
-    public function getTextContent($filePointer = null)
+    public function getTextContent()
     {
 
-        return mb_convert_encoding($this->getContent($filePointer), 'UTF-8', 'EUC-KR');
+        return mb_convert_encoding(stream_get_contents($this->getContent()), 'UTF-8', 'EUC-KR');
     }
 
     public function setContent($content)
     {
+
+        if (!is_resource($content))
+            throw new \InvalidArgumentException(
+                "Passed argument to setContent needs to be valid resource"
+            );
 
         $this->content = $content;
         $this->invalidate();
@@ -213,15 +231,32 @@ class File
     public function setTextContent($content)
     {
 
-        $this->setContent(mb_convert_encoding($content, 'EUC-KR', 'UTF-8'));
+        $this->setContent(fopen('data://text/plain;base64,'.base64_encode(
+            mb_convert_encoding($content, 'EUC-KR', 'UTF-8')
+        ), 'rb'));
 
         return $this;
+    }
+
+    public function isSpr()
+    {
+
+        return $this->isExtension('spr');
+    }
+
+    /**
+     * @return Spr
+     */
+    public function getAsSpr()
+    {
+
+        return new Spr($this->getContent());
     }
 
     private function getDirectoryListing()
     {
 
-        return implode("\n", array_keys($this->archive->getFilesIn($this->path)));
+        return implode("\n", array_keys($this->grf->getFilesIn($this->path)));
     }
 
     private function parseFileContent10x($compressedContent)
