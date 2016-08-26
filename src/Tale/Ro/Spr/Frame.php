@@ -2,6 +2,8 @@
 
 namespace Tale\Ro\Spr;
 
+use Phim\Color;
+use Phim\Color\Palette;
 use Tale\Ro\Spr;
 
 class Frame
@@ -93,7 +95,7 @@ class Frame
         fseek($this->spr->getHandle(), $this->offset);
         $data = fread($this->spr->getHandle(), $this->size);
 
-        if ($this->type === Spr::FRAME_TYPE_RGBA)
+        if ($this->type !== Spr::FRAME_TYPE_INDEXED_RLE)
             return $data;
 
         //Decode RLE
@@ -129,65 +131,97 @@ class Frame
         return imagecolorallocatealpha($im, $r, $g, $b, $a);
     }
 
-    public function getGdImage()
+    public function getGdImage($withAlpha = true, $backgroundColor = null)
     {
 
         if ($this->type === Spr::FRAME_TYPE_RGBA)
-            return $this->getGdRgbaImage();
+            return $this->getGdRgbaImage($withAlpha, $backgroundColor);
 
         $im = imagecreate($this->width, $this->height);
         $data = $this->readFrameData();
         $data = array_values(unpack('C'.strlen($data), $data));
 
-        //Build palette cleanly
-        $pal = [];
-        $palette = $this->spr->getPalette();
-        for ($i = 0; $i < 256; $i += 4) {
+        if ($withAlpha) {
 
-            $pal[] = imagecolorallocate(
-                $im,
-                $palette[$i],
-                $palette[$i + 1],
-                $palette[$i + 2]
-            );
+            imagealphablending($im, false);
+            imagesavealpha($im, true);
         }
 
+        $palette = $this->spr->getPalette();
+
+        $pal = [];
+        foreach ($palette as $color) {
+
+            //Create alpha-supporting image using the first index of the palette as the alpha color
+            if ($withAlpha && empty($pal)) {
+
+                $pal[] = imagecolorallocatealpha($im, $color->getRed(), $color->getGreen(), $color->getBlue(), 127);
+                continue;
+            } else if ($backgroundColor && empty($pal)) {
+
+                $bgColor = Color::get($backgroundColor)->getRgb();
+                $pal[] = imagecolorallocate($im, $bgColor->getRed(), $bgColor->getGreen(), $bgColor->getBlue());
+                continue;
+            }
+
+            $pal[] = imagecolorallocate($im, $color->getRed(), $color->getGreen(), $color->getBlue());
+        }
 
         for ($y = 0; $y < $this->height; $y++) {
             for ($x = 0; $x < $this->width; $x++) {
 
-                imagesetpixel($im, $x, $y, $palette[
-                    ord(
-                        $data[$y * $this->width + $x]
-                    )
-                ]);
+                imagesetpixel($im, $x, $y, $pal[$data[$y * $this->width + $x]]);
             }
         }
 
         return $im;
     }
 
-    private function getGdRgbaImage()
+    private function getGdRgbaImage($withAlpha = null, $backgroundColor = null)
     {
 
         $im = imagecreatetruecolor($this->width, $this->height);
         $data = $this->readFrameData();
         $data = array_values(unpack('C'.strlen($data), $data));
 
+        if ($withAlpha) {
+
+            imagealphablending($im, false);
+            imagesavealpha($im, true);
+        } else {
+
+            $backgroundColor = $backgroundColor ?: 'white';
+
+            imagealphablending($im, true);
+            imagesavealpha($im, false);
+
+            $bgColor = Color::get($backgroundColor)->getRgba();
+            $bgIndex = imagecolorallocatealpha($im, $bgColor->getRed(), $bgColor->getGreen(), $bgColor->getBlue(), 127 - ($bgColor->getAlpha() * 127));
+            imagefill($im, 0, 0, $bgIndex);
+        }
+
         for ($y = 0; $y < $this->height; $y++) {
             for ($x = 0; $x < $this->width; $x++) {
 
-                $i = $y * $this->width + $x;
+                $i = ($y * $this->width + $x) * 4;
                 imagesetpixel($im, $x, $y, $this->getGdColor(
                     $im,
-                    $data[$i],
-                    $data[$i + 1],
+                    $data[$i + 3],
                     $data[$i + 2],
-                    127 - $data[$i + 3]
+                    $data[$i + 1],
+                    127 - ($data[$i] / 2)
                 ));
             }
         }
 
         return $im;
+    }
+
+    public function getDataUri()
+    {
+
+        ob_start();
+        imagepng($this->getGdImage());
+        return 'data://image/png;base64,'.base64_encode(ob_get_clean());
     }
 }

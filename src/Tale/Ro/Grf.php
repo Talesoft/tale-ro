@@ -33,15 +33,19 @@ class Grf extends AbstractFormat
     const VERSION_103 = 0x103;
     const VERSION_102 = 0x102;
 
-    private $useUtf8Paths;
+    const ENCODING_UTF8 = 'UTF-8';
+    const ENCODING_ASCII = 'ASCII';
+    const ENCODING_EUC_KR = 'EUC-KR';
+
+    private $pathEncoding;
     private $header;
     private $files;
 
-    public function __construct($handle, $useUtf8Paths = true)
+    public function __construct($handle, $pathEncoding = null)
     {
         parent::__construct($handle);
         
-        $this->useUtf8Paths = $useUtf8Paths;
+        $this->pathEncoding = $pathEncoding ?: self::ENCODING_EUC_KR;
         $this->header = $this->readHeader();
         $this->files = $this->readFileTable();
     }
@@ -49,7 +53,7 @@ class Grf extends AbstractFormat
     public function isUsingUtf8Paths()
     {
 
-        return $this->useUtf8Paths;
+        return $this->pathEncoding;
     }
 
     /**
@@ -157,7 +161,7 @@ class Grf extends AbstractFormat
             };
 
             uksort($dirs, $caseInsensitiveSorter);
-            ksort($files, $caseInsensitiveSorter);
+            uksort($files, $caseInsensitiveSorter);
         }
 
         return array_replace($dirs, $files);
@@ -276,8 +280,8 @@ class Grf extends AbstractFormat
             $o++;
 
             //Convert the path to unicode (Warning: This will require mb_* pendants at points working with the path)
-            if ($this->useUtf8Paths)
-                $path = mb_convert_encoding($path, 'UTF-8', 'EUC-KR');
+            if ($this->pathEncoding !== self::ENCODING_UTF8)
+                $path = mb_convert_encoding($path, self::ENCODING_UTF8, $this->pathEncoding);
 
             $data = unpack('VcompressedSize/ValignedSize/Vsize/Cflags/Voffset', substr($tableData, $o, 17));
             $o += 17;

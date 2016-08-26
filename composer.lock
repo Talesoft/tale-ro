@@ -4,8 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "7cf1764b013f87cafa42a84b05728453",
-    "content-hash": "ea90d2017acf48339d51c17ed112f61c",
+    "hash": "4ef1726ed2c808570152bb0c84d59efd",
+    "content-hash": "1b231221143d2ce40d83ac0aaab3e735",
     "packages": [
         {
             "name": "symfony/polyfill-mbstring",
@@ -13,12 +13,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
-                "reference": "8a6bdec191138e01c92ae026e5aacb7b3e66267d"
+                "reference": "988cbed31ec9493057bcfc545b13447521849702"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/8a6bdec191138e01c92ae026e5aacb7b3e66267d",
-                "reference": "8a6bdec191138e01c92ae026e5aacb7b3e66267d",
+                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/988cbed31ec9493057bcfc545b13447521849702",
+                "reference": "988cbed31ec9493057bcfc545b13447521849702",
                 "shasum": ""
             },
             "require": {
@@ -64,7 +64,65 @@
                 "portable",
                 "shim"
             ],
-            "time": "2016-06-29 14:58:48"
+            "time": "2016-08-17 08:39:54"
+        },
+        {
+            "name": "talesoft/phim",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Talesoft/phim.git",
+                "reference": "ca8a2b314919b8ae0583d133acdd07f3bb34e3f4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Talesoft/phim/zipball/ca8a2b314919b8ae0583d133acdd07f3bb34e3f4",
+                "reference": "ca8a2b314919b8ae0583d133acdd07f3bb34e3f4",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.5.0"
+            },
+            "suggest": {
+                "gd": "for image processing with GD",
+                "imagick": "for image processing with Imagick",
+                "symfony/mbstring-polyfill": "if youre lacking the mbstring extension or can't install it"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "": "src/"
+                },
+                "files": [
+                    "src/Phim/functions.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Torben Koehn",
+                    "email": "torben@talesoft.codes"
+                }
+            ],
+            "description": "An image and color manipulation and processing library for PHP",
+            "homepage": "http://phim.talesoft.codes",
+            "keywords": [
+                "CIEDE2000",
+                "cie",
+                "color",
+                "gd",
+                "hsl",
+                "hsv",
+                "image",
+                "imagick",
+                "lab",
+                "manipulation",
+                "processing"
+            ],
+            "time": "2016-08-18 14:32:24"
         }
     ],
     "packages-dev": [],
@@ -73,8 +131,6 @@
     "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": {
-        "ext-mbstring": "*"
-    },
+    "platform": [],
     "platform-dev": []
 }

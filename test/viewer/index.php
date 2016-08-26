@@ -1,5 +1,6 @@
 <?php
 
+use Phim\Color\Palette;
 use Tale\Ro\Grf;
 use Tale\Ro\Grf\File;
 
@@ -12,10 +13,12 @@ $path = isset($_GET['path']) ? $_GET['path'] : '';
 
 $grfPath = __DIR__.'/../'.$grfFile;
 
-$archive = new Grf(fopen($grfPath, 'rb'));
+$archive = new Grf(fopen($grfPath, 'rb'), Grf::ENCODING_ASCII);
 
 //Get some info about the recent file
 $currentFile = $archive->hasFile($path) ? $archive->getFile($path) : null;
+
+ini_set('xdebug.var_display_max_depth', 10);
 
 //Display a file as content if possible
 if ($currentFile && !$currentFile->isDirectory()) {
@@ -29,17 +32,37 @@ if ($currentFile && !$currentFile->isDirectory()) {
         case 'bmp':
 
             header('Content-Type: image/bmp; encoding=utf-8');
-            echo $currentFile->getContent();
+            echo $currentFile->getContentHandle();
             break;
         case 'spr':
 
             $frame = isset($_GET['f']) ? intval($_GET['f']) : 0;
+            $pal = isset($_GET['pal']) ? true : false;
 
-            header('Content-Type: image/png; encoding=utf-8');
             $spr = $currentFile->getAsSpr();
 
-            $im = $spr->getFrames()[$frame]->getGdImage();
-            imagepng($im);
+            if ($pal) {
+
+                echo Palette::getHtml($spr->getPalette(), 16, 100, 100);
+                break;
+            }
+
+            foreach ($spr->getFrames() as $frame) {
+
+                echo "<img src=\"{$frame->getDataUri()}\" width=\"{$frame->getWidth()}\" height=\"{$frame->getHeight()}\">";
+            }
+
+            echo '<br><a href="?path='.substr($currentFile->getPath(), 0, -4).'.act">View ACT-file</a>';
+            break;
+        case 'act':
+
+            $act = $currentFile->getAsAct();
+
+            echo '<pre><code>';
+            var_dump($act);
+            echo '</code></pre>';
+
+            echo '<br><a href="?path='.substr($currentFile->getPath(), 0, -4).'.spr">View SPR-file</a>';
             break;
         default:
 
@@ -49,7 +72,7 @@ if ($currentFile && !$currentFile->isDirectory()) {
             echo implode(' ', array_map(function($c) {
 
                 return str_pad(dechex(ord($c)), 2, '0', STR_PAD_LEFT);
-            }, str_split($currentFile->getContent())));
+            }, str_split($currentFile->getTextContent(Grf::ENCODING_UTF8))));
             break;
     }
 
@@ -82,7 +105,7 @@ function format_size($size)
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title><?=$path?> | RO GRF Viewer | 2016 Rotale</title>
+        <title><?=$path?> | RO GRF Viewer | 2016 Talesoft</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.2/semantic.min.css">
         <style>
 

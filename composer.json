@@ -10,8 +10,8 @@
         }
     ],
     "require": {
-        "ext-mbstring": "*",
-        "symfony/polyfill-mbstring": "*"
+        "symfony/polyfill-mbstring": "*",
+        "talesoft/phim": "*"
     },
     "autoload": {
         "psr-4": {

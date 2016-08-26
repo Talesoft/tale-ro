@@ -3,6 +3,10 @@
 namespace Tale\Ro;
 
 //https://github.com/vthibault/ROChargenPHP/blob/master/loaders/class.Sprite.php
+use Phim\Color\Palette\SimplePalette;
+use Phim\Color\PaletteInterface;
+use Phim\Color\RgbaColor;
+use Phim\ColorInterface;
 use Tale\Ro\Spr\Frame;
 
 class Spr extends AbstractFormat
@@ -86,7 +90,7 @@ class Spr extends AbstractFormat
     }
 
     /**
-     * @return array
+     * @return PaletteInterface|RgbaColor[]
      */
     public function getPalette()
     {
@@ -107,12 +111,12 @@ class Spr extends AbstractFormat
 
         if ($this->getSize() < 6)
             throw new \RuntimeException(
-                "Failed to read sprite: Header needs to have at least 4 bytes"
+                "Failed to read sprite: Header needs to have at least 6 bytes"
             );
 
         fseek($this->getHandle(), 0);
 
-        $header = unpack('A2magicHeader/CmajorVersion/CminorVersion/vindexedFrameCount', fread($this->getHandle(), 6));
+        $header = unpack('A2magicHeader/CminorVersion/CmajorVersion/vindexedFrameCount', fread($this->getHandle(), 6));
 
         if ($header['magicHeader'] !== self::MAGIC_HEADER)
             throw new \RuntimeException(
@@ -120,7 +124,7 @@ class Spr extends AbstractFormat
             );
 
         $this->magicHeader = $header['magicHeader'];
-        $this->version = $header['majorVersion'] / 10 + $header['minorVersion'];
+        $this->version = $header['minorVersion'] / 10 + $header['majorVersion'];
         $this->indexedFrameCount = $header['indexedFrameCount'];
 
         if ($this->version > 1.1)
@@ -133,8 +137,20 @@ class Spr extends AbstractFormat
 
         $this->readRgbaFrames();
 
-        if ($this->version > 1.0)
-            $this->palette = array_values(unpack('C1024', fread($this->getHandle(), 1024)));
+        if ($this->version > 1.0) {
+
+            $palSize = 1024;
+            fseek($this->getHandle(), -$palSize, SEEK_END);
+            $data = array_values(unpack('C1024', fread($this->getHandle(), $palSize)));
+
+            $pal = [];
+            for ($i = 0; $i < $palSize; $i += 4) {
+
+                $pal[] = new RgbaColor($data[$i], $data[$i + 1], $data[$i + 2], (255 - $data[$i + 3]) / 255);
+            }
+
+            $this->palette = new SimplePalette($pal, $palSize);
+        }
     }
 
     private function readIndexedFrames()

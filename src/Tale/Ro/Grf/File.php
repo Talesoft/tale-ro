@@ -2,6 +2,8 @@
 
 namespace Tale\Ro\Grf;
 
+use Tale\Ro\Act;
+use Tale\Ro\Act\Action;
 use Tale\Ro\Grf;
 use Tale\Ro\Grf\File\Info;
 use Tale\Ro\Spr;
@@ -132,7 +134,7 @@ class File
     /**
      * @return resource
      */
-    public function getContent()
+    public function getContentHandle()
     {
 
         //If custom content is set, we return that one
@@ -156,7 +158,7 @@ class File
 
         if (($this->flags & Grf::FILE_TYPE_ENCRYPTED_DES) || ($this->flags & Grf::FILE_TYPE_ENCRYPTED_MIXED))
             throw new \RuntimeException(
-                "Failed to read GRF file [$this->path]: Encrypted files are not supported right now"
+                "Failed to read GRF file [$this->path]: Encrypted files are not supported right now. Catch this and skip the file."
             );
 
         //Calculate total offset of the file content
@@ -190,9 +192,7 @@ class File
         $content = @zlib_decode($compressedContent);
 
         if ($content === false)
-            throw new \RuntimeException(
-                "Failed to decompress file [$this->path]"
-            );
+            throw new \RuntimeException("Failed to decompress file [$this->path]");
 
         if (strlen($content) !== $this->info->getSize())
             throw new \RuntimeException(
@@ -208,13 +208,7 @@ class File
         return $this->content;
     }
 
-    public function getTextContent()
-    {
-
-        return mb_convert_encoding(stream_get_contents($this->getContent()), 'UTF-8', 'EUC-KR');
-    }
-
-    public function setContent($content)
+    public function setContentHandle($content)
     {
 
         if (!is_resource($content))
@@ -227,13 +221,28 @@ class File
 
         return $this;
     }
-
-    public function setTextContent($content)
+    
+    public function getTextContent($encoding = false)
     {
 
-        $this->setContent(fopen('data://text/plain;base64,'.base64_encode(
-            mb_convert_encoding($content, 'EUC-KR', 'UTF-8')
-        ), 'rb'));
+        $encoding = $encoding ?: Grf::ENCODING_EUC_KR;
+
+        $content = stream_get_contents($this->getContentHandle());
+
+        if ($encoding !== Grf::ENCODING_UTF8)
+            $content = mb_convert_encoding($content, Grf::ENCODING_UTF8, $encoding);
+
+        return $content;
+    }
+    
+    public function setTextContent($content)
+    {
+        
+        $content = mb_convert_encoding($content, mb_detect_encoding($content,
+            implode(',', [Grf::ENCODING_EUC_KR, Grf::ENCODING_ASCII, Grf::ENCODING_ASCII])
+        ), 'UTF-8');
+
+        $this->setContentHandle(fopen('data://text/plain;base64,'.base64_encode($content), 'rb'));
 
         return $this;
     }
@@ -250,7 +259,16 @@ class File
     public function getAsSpr()
     {
 
-        return new Spr($this->getContent());
+        return new Spr($this->getContentHandle());
+    }
+
+    /**
+     * @return Act
+     */
+    public function getAsAct()
+    {
+
+        return new Act($this->getContentHandle());
     }
 
     private function getDirectoryListing()
