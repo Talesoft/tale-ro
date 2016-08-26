@@ -1,6 +1,6 @@
 {
-    "name": "talesoft/tale-ro-grf",
-    "description": "Ragnarok Online GRF library",
+    "name": "talesoft/tale-ro",
+    "description": "Ragnarok Online File Format library",
     "minimum-stability": "dev",
     "license": "MIT",
     "authors": [
