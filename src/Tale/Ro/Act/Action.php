@@ -21,6 +21,14 @@ class Action
         $this->motions = $motions;
     }
 
+    /**
+     * @return Motion[]
+     */
+    public function getMotions()
+    {
+
+        return $this->motions;
+    }
 
     public function __debugInfo()
     {

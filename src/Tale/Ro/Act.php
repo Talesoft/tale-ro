@@ -2,7 +2,6 @@
 
 namespace Tale\Ro;
 
-
 use Tale\Ro\Act\Action;
 use Tale\Ro\Act\AttachInfo;
 use Tale\Ro\Act\Clip;
@@ -53,6 +52,41 @@ class Act extends AbstractFormat
         return $this->version;
     }
 
+    /**
+     * @return array
+     */
+    public function getActions()
+    {
+
+        return $this->actions;
+    }
+
+    public function hasAction($index)
+    {
+
+        return isset($this->actions[$index]);
+    }
+
+    /**
+     * @param $index
+     *
+     * @return Action
+     */
+    public function getAction($index)
+    {
+
+        return $this->actions[$index];
+    }
+
+    /**
+     * @return array
+     */
+    public function getSounds()
+    {
+
+        return $this->sounds;
+    }
+
     private function read()
     {
 
@@ -87,14 +121,13 @@ class Act extends AbstractFormat
     private function readActions($actionCount)
     {
 
+        $handle = $this->getHandle();
         //Skip to end of header
-        fseek($this->getHandle(), self::HEADER_SIZE);
-
-        var_dump("Action Count: $actionCount");
+        fseek($handle, self::HEADER_SIZE);
 
 		for ($i = 0; $i < $actionCount; $i++) {
 
-            $motionCount = unpack('V', fread($this->getHandle(), 4))[1];
+            $motionCount = unpack('V', fread($handle, 4))[1];
 
             $motions = [];
             for ($j = 0; $j < $motionCount; $j++) {
@@ -106,10 +139,8 @@ class Act extends AbstractFormat
                 $range2 = new Rectangle($data['left2'], $data['top2'], $data['right2'], $data['bottom2']);*/
 
 
-                fseek($this->getHandle(), 32, SEEK_CUR);
-                $clipCount = unpack('V', fread($this->getHandle(), 4))[1];
-
-                var_dump("CC $clipCount");
+                fseek($handle, 32, SEEK_CUR);
+                $clipCount = unpack('V', fread($handle, 4))[1];
 
                 $clips = [];
                 for ($k = 0; $k < $clipCount; $k++) {
@@ -117,13 +148,11 @@ class Act extends AbstractFormat
                     $clip = null;
                     if ($this->version < 2.0) {
 
-                        $data = unpack('Vx/Vy/VspriteIndex/Vflags', fread($this->getHandle(), 16));
+                        $data = unpack('Vx/Vy/VspriteIndex/Vflags', fread($handle, 16));
                         $clip = new Clip($data['x'], $data['y'], $data['spriteIndex'], $data['flags'], 255, 255, 255, 255, 1.0, 1.0, 0, 0);
                     } else if ($this->version < 2.4) {
 
-                        trigger_error('Reading with <2.4', E_USER_NOTICE);
-
-                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoom/Vangle/Vtype', fread($this->getHandle(), 32));
+                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoom/Vangle/Vtype', fread($handle, 32));
                         $clip = new Clip(
                             $data['x'], $data['y'], $data['spriteIndex'], $data['flags'],
                             $data['r'], $data['g'], $data['b'], $data['a'],
@@ -132,7 +161,7 @@ class Act extends AbstractFormat
                     } else if ($this->version === 2.4) {
 
 
-                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoomX/fzoomY/Vangle/Vtype', fread($this->getHandle(), 36));
+                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoomX/fzoomY/Vangle/Vtype', fread($handle, 36));
                         $clip = new Clip(
                             $data['x'], $data['y'], $data['spriteIndex'], $data['flags'],
                             $data['r'], $data['g'], $data['b'], $data['a'],
@@ -140,8 +169,7 @@ class Act extends AbstractFormat
                         );
                     } else {
 
-                        trigger_error('Reading with >2.5', E_USER_NOTICE);
-                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoomX/fzoomY/Vangle/Vtype/Vwidth/Vheight', fread($this->getHandle(), 44));
+                        $data = unpack('Vx/Vy/VspriteIndex/Vflags/Cr/Cg/Cb/Ca/fzoomX/fzoomY/Vangle/Vtype/Vwidth/Vheight', fread($handle, 44));
                         $clip = new Clip(
                             $data['x'], $data['y'], $data['spriteIndex'], $data['flags'],
                             $data['r'], $data['g'], $data['b'], $data['a'],
@@ -156,7 +184,7 @@ class Act extends AbstractFormat
 
                 $eventId = -1;
                 if ($this->version >= 2.0)
-                    $eventId = unpack('V', fread($this->getHandle(), 4))[1];
+                    $eventId = unpack('V', fread($handle, 4))[1];
 
                 if ($this->version === 2.0)
                     $eventId = -1;
@@ -164,20 +192,16 @@ class Act extends AbstractFormat
                 $attachInfos = [];
                 if ($this->version >= 2.3) {
 
-                    $attachInfoCount = unpack('V', fread($this->getHandle(), 4))[1];
+                    $attachInfoCount = unpack('V', fread($handle, 4))[1];
 
                     for ($k = 0; $k < $attachInfoCount; $k++) {
 
-                        $data = unpack('Vunknown/Vx/Vy/Vattribute', fread($this->getHandle(), 16));
+                        $data = unpack('Vunknown/Vx/Vy/Vattribute', fread($handle, 16));
                         $attachInfos[] = new AttachInfo($data['unknown'], $data['x'], $data['y'], $data['attribute']);
                     }
                 }
 
                 $motions[] = $motion = new Motion(new Rectangle(0, 0, 0, 0), new Rectangle(0, 0, 0, 0), $clips, $eventId, $attachInfos);
-
-                var_dump("Motion $j (".ftell($this->getHandle()).")", $motion);
-
-                if ($j > 1) exit;
             }
 
             $this->actions[] = new Action($this, $motions);

@@ -18,6 +18,10 @@ class Spr extends AbstractFormat
     const FRAME_TYPE_INDEXED = 0;
     const FRAME_TYPE_INDEXED_RLE = 1;
     const FRAME_TYPE_RGBA = 2;
+
+    const FLIP_HORIZONTAL = \IMG_FLIP_HORIZONTAL;
+    const FLIP_VERTICAL = \IMG_FLIP_VERTICAL;
+    const FLIP_BOTH = \IMG_FLIP_BOTH;
     
     private $magicHeader;
     private $version;
@@ -87,6 +91,18 @@ class Spr extends AbstractFormat
     {
 
         return $this->frames;
+    }
+
+    public function hasFrame($index)
+    {
+
+        return isset($this->frames[$index]);
+    }
+
+    public function getFrame($index)
+    {
+
+        return $this->frames[$index];
     }
 
     /**

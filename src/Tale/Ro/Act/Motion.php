@@ -45,7 +45,7 @@ class Motion
     }
 
     /**
-     * @return mixed
+     * @return Clip[]
      */
     public function getClips()
     {
@@ -53,6 +53,11 @@ class Motion
         return $this->clips;
     }
 
+    /**
+     * @param $index
+     *
+     * @return Clip
+     */
     public function getClip($index)
     {
 

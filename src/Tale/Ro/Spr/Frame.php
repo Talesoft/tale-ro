@@ -92,6 +92,11 @@ class Frame
     public function readFrameData()
     {
 
+        if (!is_resource($this->spr->getHandle())) {
+
+            throw new \InvalidArgumentException("Invalid handle passed");
+        }
+
         fseek($this->spr->getHandle(), $this->offset);
         $data = fread($this->spr->getHandle(), $this->size);
 
@@ -131,48 +136,55 @@ class Frame
         return imagecolorallocatealpha($im, $r, $g, $b, $a);
     }
 
-    public function getGdImage($withAlpha = true, $backgroundColor = null)
+    public function getGdImage($withAlpha = true, $backgroundColor = null, $flipMode = null)
     {
 
-        if ($this->type === Spr::FRAME_TYPE_RGBA)
-            return $this->getGdRgbaImage($withAlpha, $backgroundColor);
+        if ($this->type === Spr::FRAME_TYPE_RGBA) {
 
-        $im = imagecreate($this->width, $this->height);
-        $data = $this->readFrameData();
-        $data = array_values(unpack('C'.strlen($data), $data));
+            $im = $this->getGdRgbaImage($withAlpha, $backgroundColor);
+        } else {
 
-        if ($withAlpha) {
+            $im = imagecreate($this->width, $this->height);
+            $data = $this->readFrameData();
+            $data = array_values(unpack('C'.strlen($data), $data));
 
-            imagealphablending($im, false);
-            imagesavealpha($im, true);
-        }
+            if ($withAlpha) {
 
-        $palette = $this->spr->getPalette();
-
-        $pal = [];
-        foreach ($palette as $color) {
-
-            //Create alpha-supporting image using the first index of the palette as the alpha color
-            if ($withAlpha && empty($pal)) {
-
-                $pal[] = imagecolorallocatealpha($im, $color->getRed(), $color->getGreen(), $color->getBlue(), 127);
-                continue;
-            } else if ($backgroundColor && empty($pal)) {
-
-                $bgColor = Color::get($backgroundColor)->getRgb();
-                $pal[] = imagecolorallocate($im, $bgColor->getRed(), $bgColor->getGreen(), $bgColor->getBlue());
-                continue;
+                imagealphablending($im, false);
+                imagesavealpha($im, true);
             }
 
-            $pal[] = imagecolorallocate($im, $color->getRed(), $color->getGreen(), $color->getBlue());
-        }
+            $palette = $this->spr->getPalette();
 
-        for ($y = 0; $y < $this->height; $y++) {
-            for ($x = 0; $x < $this->width; $x++) {
+            $pal = [];
+            foreach ($palette as $color) {
 
-                imagesetpixel($im, $x, $y, $pal[$data[$y * $this->width + $x]]);
+                //Create alpha-supporting image using the first index of the palette as the alpha color
+                if ($withAlpha && empty($pal)) {
+
+                    $pal[] = imagecolorallocatealpha($im, $color->getRed(), $color->getGreen(), $color->getBlue(), 127);
+                    imagecolortransparent($im, $pal[0]);
+                    continue;
+                } else if ($backgroundColor && empty($pal)) {
+
+                    $bgColor = Color::get($backgroundColor)->getRgb();
+                    $pal[] = imagecolorallocate($im, $bgColor->getRed(), $bgColor->getGreen(), $bgColor->getBlue());
+                    continue;
+                }
+
+                $pal[] = imagecolorallocate($im, $color->getRed(), $color->getGreen(), $color->getBlue());
+            }
+
+            for ($y = 0; $y < $this->height; $y++) {
+                for ($x = 0; $x < $this->width; $x++) {
+
+                    imagesetpixel($im, $x, $y, $pal[$data[$y * $this->width + $x]]);
+                }
             }
         }
+
+        if ($flipMode)
+            imageflip($im, $flipMode);
 
         return $im;
     }

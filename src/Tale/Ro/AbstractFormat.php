@@ -12,7 +12,7 @@ abstract class AbstractFormat
 
         if (!is_resource($handle))
             throw new \InvalidArgumentException(
-                "Handle passed to format needs to be a valid resource"
+                "Handle passed to format needs to be a valid resource, ".gettype($handle)." ($handle) given"
             );
 
         $this->handle = $handle;
@@ -20,9 +20,12 @@ abstract class AbstractFormat
 
     public function __destruct()
     {
-        
+
+        //Dont close??
+        /*
         if (is_resource($this->handle))
             fclose($this->handle);
+        */
     }
 
     /**
